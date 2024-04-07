@@ -3,15 +3,21 @@ import client from "@/app/lib/redis";
 const JOB_DURATION = 4000; //4 seconds
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const jobId = url.searchParams.get("jobId");
-  if (!jobId) {
-    return new Response("Missing jobId", {
-      status: 400,
-    });
-  }
-
   try {
+    const url = new URL(request.url);
+    const jobId = url.searchParams.get("jobId");
+    if (!jobId) {
+      return new Response("Missing jobId", {
+        status: 400,
+      });
+    }
+
+    if (Math.random() < 0.2) {
+      return new Response("error", {
+        status: 200,
+      });
+    }
+
     const startTime = await client.get(`${jobId}:startTime`);
     const currentTime = Date.now();
     const randomDelay = await client.get(`${jobId}:randomDelay`);
@@ -32,9 +38,7 @@ export async function GET(request: Request) {
     if (elapsedTime > JOB_DURATION + parseInt(randomDelay)) {
       await client.del(`${jobId}:startTime`);
       await client.del(`${jobId}:randomDelay`);
-
-      const randomResult = Math.random() < 0.7 ? "completed" : "error";
-      return new Response(randomResult, {
+      return new Response("completed", {
         status: 200,
       });
     } else {

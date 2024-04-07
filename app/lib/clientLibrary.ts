@@ -1,17 +1,5 @@
 import { useState } from "react";
 
-export async function fetchStatus(jobId: string): Promise<Status> {
-  const response = await fetch(
-    `http://localhost:3001/api/status?jobId=${jobId}`,
-    { cache: "no-store" }
-  );
-  const status = await response.text();
-  if (status !== "pending" && status !== "completed" && status !== "error") {
-    throw new Error(`Unexpected status: ${status}`);
-  }
-  return status;
-}
-
 type Status = "pending" | "completed" | "error";
 
 type PollingOptions = {
@@ -27,7 +15,19 @@ type Log = {
   status: Status;
 };
 
-export const useStatus = () => {
+async function fetchStatus(jobId: string): Promise<Status> {
+  const response = await fetch(
+    `http://localhost:3001/api/status?jobId=${jobId}`,
+    { cache: "no-store" }
+  );
+  const status = await response.text();
+  if (status !== "pending" && status !== "completed" && status !== "error") {
+    throw new Error(`Unexpected status: ${status}`);
+  }
+  return status;
+}
+
+const useStatus = () => {
   const [statusLogs, setStatusLogs] = useState<Log[]>([]);
 
   async function subscribeToStatus(
@@ -71,3 +71,5 @@ export const useStatus = () => {
   }
   return { statusLogs, subscribeToStatus };
 };
+
+export { useStatus };
