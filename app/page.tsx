@@ -1,32 +1,30 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useStatus } from "./lib/clientLibrary";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { useStatus } from "./lib/clientLibrary";
 
 export default function Home() {
-  const { statusLogs, subscribeToStatus } = useStatus();
-  const [jobId, setJobId] = useState(
-    Math.floor(Math.random() * 10000).toString()
-  );
+  const { statusLogs, subscribeToStatusWithHook } = useStatus();
+  const [jobId, setJobId] = useState("");
 
   return (
     <div className="bg-white h-screen w-screen flex flex-col items-center py-20">
-      <div className="w-1/2 items-center flex flex-col gap-4">
+      <div className="w-1/2 items-center flex flex-col gap-4 min-w-[500px]">
         <form
           className="flex flex-row items-center gap-2 w-full"
           onSubmit={(e) => {
             e.preventDefault();
-            subscribeToStatus(jobId);
+            subscribeToStatusWithHook({ jobId });
           }}
         >
           <Input
-            placeholder="Enter Job ID"
+            placeholder="Enter Job ID (e.g. 123450)"
             value={jobId}
             onChange={(e) => setJobId(e.target.value.slice(0, 10))}
           />
-          <Button type="submit">Subscribe</Button>
+          <Button type="submit">Subscribe to Job Status</Button>
         </form>
         <div className="flex flex-col gap-1 w-full">
           {[...statusLogs].reverse().map((log, i) => (
@@ -54,7 +52,7 @@ export default function Home() {
                   log.status === "error" && "text-red-500"
                 )}
               >
-                {log.status.toLocaleUpperCase()}
+                {log.status.toUpperCase()}
               </p>
             </div>
           ))}

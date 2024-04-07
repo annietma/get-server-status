@@ -1,12 +1,20 @@
 import { useState } from "react";
 
-type Status = "pending" | "completed" | "error" | "fetching error";
+export type Status = "pending" | "completed" | "error" | "fetching error";
+
+type SubscribeToStatusProps = {
+  jobId: string;
+  onStatusUpdate?: (log: Log) => void;
+  onCompleted?: (log: Log) => void;
+  options?: PollingOptions;
+};
 
 type PollingOptions = {
   initialDelay?: number;
   maxDelay?: number;
   maxAttempts?: number;
   backoffFactor?: number;
+  jitter?: boolean;
 };
 
 type Log = {
@@ -15,10 +23,10 @@ type Log = {
   status: Status;
 };
 
-async function fetchStatus(jobId: string): Promise<Status> {
+export async function fetchStatus(jobId: string): Promise<Status> {
   try {
     const response = await fetch(
-      `http://localhost:3001/api/status?jobId=${jobId}`,
+      `${process.env.BASE_URL as string}/api/status?jobId=${jobId}`,
       { cache: "no-store" }
     );
     const status = await response.text();
@@ -37,50 +45,71 @@ async function fetchStatus(jobId: string): Promise<Status> {
   }
 }
 
+async function subscribeToStatus({
+  jobId,
+  onStatusUpdate = () => {},
+  onCompleted = () => {},
+  options = {},
+}: SubscribeToStatusProps) {
+  const {
+    initialDelay = 1000,
+    maxDelay = 30000,
+    maxAttempts = 10,
+    backoffFactor = 2,
+    jitter = true,
+  } = options;
+
+  let attempts = 0;
+  let delay = initialDelay;
+
+  while (attempts < maxAttempts) {
+    const status = await fetchStatus(jobId);
+    onStatusUpdate({ timestamp: new Date(), jobId, status });
+
+    if (status === "completed" || status === "error") {
+      onCompleted({ timestamp: new Date(), jobId, status });
+      return;
+    }
+    attempts++;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    //exponential backoff with optional jitter
+    delay = Math.min(
+      initialDelay * Math.pow(backoffFactor, attempts),
+      maxDelay
+    );
+    if (jitter) {
+      delay = delay * (0.5 + Math.random());
+    }
+    delay = Math.min(delay, maxDelay);
+  }
+
+  onCompleted({ timestamp: new Date(), jobId, status: "fetching error" });
+}
+
 const useStatus = () => {
   const [statusLogs, setStatusLogs] = useState<Log[]>([]);
 
-  async function subscribeToStatus(
-    jobId: string,
-    onCompleted: (status: Status) => void = () => {},
-    options: PollingOptions = {}
-  ) {
-    const {
-      initialDelay = 1000,
-      maxDelay = 30000,
-      maxAttempts = 10,
-      backoffFactor = 2,
-    } = options;
-
-    let attempts = 0;
-    let delay = initialDelay;
-
-    while (attempts < maxAttempts) {
-      const status = await fetchStatus(jobId);
-      setStatusLogs((logs) => [
-        ...logs,
-        { timestamp: new Date(), jobId, status },
-      ]);
-
-      if (status === "completed" || status === "error") {
+  async function subscribeToStatusWithHook({
+    jobId,
+    onStatusUpdate = () => {},
+    onCompleted = () => {},
+    options = {},
+  }: SubscribeToStatusProps) {
+    await subscribeToStatus({
+      jobId,
+      onStatusUpdate: (log) => {
+        setStatusLogs((logs) => [...logs, log]);
+        onStatusUpdate(log);
+      },
+      onCompleted: (status) => {
         onCompleted(status);
-        return;
-      }
-      attempts++;
-      await new Promise((resolve) => setTimeout(resolve, delay));
-
-      //exponential backoff with jitter
-      delay = Math.min(
-        initialDelay * Math.pow(backoffFactor, attempts),
-        maxDelay
-      );
-      delay = delay * (0.5 + Math.random());
-      delay = Math.min(delay, maxDelay);
-    }
-
-    onCompleted("error");
+      },
+      options,
+    });
   }
-  return { statusLogs, subscribeToStatus };
+
+  return { statusLogs, subscribeToStatusWithHook };
 };
 
-export { useStatus };
+export { useStatus, subscribeToStatus };

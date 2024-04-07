@@ -1,8 +1,8 @@
 import client from "@/app/lib/redis";
 
-const JOB_BASE_DURATION = 5000; //5 seconds
-const RATE_LIMIT = 10;
-const RATE_LIMIT_WINDOW = 20;
+const JOB_BASE_DURATION = 2000; //2 seconds
+const RATE_LIMIT = 100;
+const RATE_LIMIT_WINDOW = 60;
 
 export async function GET(request: Request) {
   try {
