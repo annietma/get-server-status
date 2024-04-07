@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-type Status = "pending" | "completed" | "error";
+type Status = "pending" | "completed" | "error" | "fetching error";
 
 type PollingOptions = {
   initialDelay?: number;
@@ -16,15 +16,25 @@ type Log = {
 };
 
 async function fetchStatus(jobId: string): Promise<Status> {
-  const response = await fetch(
-    `http://localhost:3001/api/status?jobId=${jobId}`,
-    { cache: "no-store" }
-  );
-  const status = await response.text();
-  if (status !== "pending" && status !== "completed" && status !== "error") {
-    throw new Error(`Unexpected status: ${status}`);
+  try {
+    const response = await fetch(
+      `http://localhost:3001/api/status?jobId=${jobId}`,
+      { cache: "no-store" }
+    );
+    const status = await response.text();
+    if (!response.ok) {
+      console.error(`Server returned error: ${response.statusText}`);
+      return "fetching error";
+    }
+    if (status !== "pending" && status !== "completed" && status !== "error") {
+      console.error(`Unexpected status: ${status}`);
+      return "fetching error";
+    }
+    return status;
+  } catch (error) {
+    console.error(`Error fetching status: ${error}`);
+    return "fetching error";
   }
-  return status;
 }
 
 const useStatus = () => {
@@ -46,25 +56,26 @@ const useStatus = () => {
     let delay = initialDelay;
 
     while (attempts < maxAttempts) {
-      try {
-        const status = await fetchStatus(jobId);
-        setStatusLogs((logs) => [
-          ...logs,
-          { timestamp: new Date(), jobId, status },
-        ]);
+      const status = await fetchStatus(jobId);
+      setStatusLogs((logs) => [
+        ...logs,
+        { timestamp: new Date(), jobId, status },
+      ]);
 
-        if (status === "completed" || status === "error") {
-          onCompleted(status);
-          return;
-        }
-      } catch (error) {
-        console.error("Error retrieving translation status:", error);
+      if (status === "completed" || status === "error") {
+        onCompleted(status);
+        return;
       }
-
       attempts++;
       await new Promise((resolve) => setTimeout(resolve, delay));
 
-      delay = Math.min(delay * backoffFactor, maxDelay);
+      //exponential backoff with jitter
+      delay = Math.min(
+        initialDelay * Math.pow(backoffFactor, attempts),
+        maxDelay
+      );
+      delay = delay * (0.5 + Math.random());
+      delay = Math.min(delay, maxDelay);
     }
 
     onCompleted("error");
