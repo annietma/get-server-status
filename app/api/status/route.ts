@@ -1,6 +1,7 @@
-import client from "@/app/lib/redis";
+import client from "@/app/server/redis";
 
 const JOB_BASE_DURATION = 2000; //2 seconds
+const JOB_RANDOM_DELAY = 10000; //10 seconds
 const RATE_LIMIT = 100;
 const RATE_LIMIT_WINDOW = 60;
 
@@ -16,8 +17,9 @@ export async function GET(request: Request) {
       currentWindowCount !== null &&
       parseInt(currentWindowCount) >= RATE_LIMIT
     ) {
-      return new Response("Too Many Requests", {
+      return new Response(null, {
         status: 429,
+        statusText: "Too Many Requests",
       });
     }
     if (currentWindowCount === null) {
@@ -29,8 +31,9 @@ export async function GET(request: Request) {
     //check for jobId
     const jobId = url.searchParams.get("jobId");
     if (!jobId) {
-      return new Response("Missing jobId", {
+      return new Response(null, {
         status: 400,
+        statusText: "Bad Request, missing jobId",
       });
     }
 
@@ -38,7 +41,7 @@ export async function GET(request: Request) {
     if (Math.random() < 0.1) {
       await client.del(`${jobId}:startTime`);
       await client.del(`${jobId}:randomDelay`);
-      return new Response("error", {
+      return new Response(JSON.stringify({ result: "error" }), {
         status: 200,
       });
     }
@@ -52,9 +55,9 @@ export async function GET(request: Request) {
       await client.set(`${jobId}:startTime`, currentTime.toString());
       await client.set(
         `${jobId}:randomDelay`,
-        Math.floor(Math.random() * 10000).toString()
+        Math.floor(Math.random() * JOB_RANDOM_DELAY).toString()
       );
-      return new Response("pending", {
+      return new Response(JSON.stringify({ result: "pending" }), {
         status: 200,
       });
     }
@@ -64,17 +67,18 @@ export async function GET(request: Request) {
     if (elapsedTime > JOB_BASE_DURATION + parseInt(randomDelay)) {
       await client.del(`${jobId}:startTime`);
       await client.del(`${jobId}:randomDelay`);
-      return new Response("completed", {
+      return new Response(JSON.stringify({ result: "completed" }), {
         status: 200,
       });
     } else {
-      return new Response("pending", {
+      return new Response(JSON.stringify({ result: "pending" }), {
         status: 200,
       });
     }
   } catch (error) {
-    return new Response("Internal Server Error", {
+    return new Response(null, {
       status: 500,
+      statusText: "Internal Server Error",
     });
   }
 }

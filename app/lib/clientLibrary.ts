@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export type Status = "pending" | "completed" | "error" | "fetching error";
+type Status = "pending" | "completed" | "error" | "fetching error";
 
 type SubscribeToStatusProps = {
   jobId: string;
@@ -23,17 +23,18 @@ type Log = {
   status: Status;
 };
 
-export async function fetchStatus(jobId: string): Promise<Status> {
+async function fetchStatus(jobId: string): Promise<Status> {
   try {
     const response = await fetch(
-      `${process.env.BASE_URL as string}/api/status?jobId=${jobId}`,
+      `${process.env.NEXT_PUBLIC_BASE_URL}/api/status?jobId=${jobId}`,
       { cache: "no-store" }
     );
-    const status = await response.text();
     if (!response.ok) {
       console.error(`Server returned error: ${response.statusText}`);
       return "fetching error";
     }
+    const resBody = await response.text();
+    const { result: status } = JSON.parse(resBody);
     if (status !== "pending" && status !== "completed" && status !== "error") {
       console.error(`Unexpected status: ${status}`);
       return "fetching error";
@@ -66,7 +67,7 @@ async function subscribeToStatus({
     const status = await fetchStatus(jobId);
     onStatusUpdate({ timestamp: new Date(), jobId, status });
 
-    if (status === "completed" || status === "error") {
+    if (status != "pending") {
       onCompleted({ timestamp: new Date(), jobId, status });
       return;
     }

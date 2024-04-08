@@ -39,7 +39,7 @@ export default defineConfig({
 
   webServer: {
     command: "npm run start",
-    url: `${process.env.BASE_URL}`,
+    url: `${process.env.NEXT_PUBLIC_BASE_URL}`,
     reuseExistingServer: !process.env.CI,
   },
 });
