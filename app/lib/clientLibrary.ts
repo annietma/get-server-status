@@ -1,12 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-type Status = "pending" | "completed" | "error" | "fetching error";
+enum Status {
+  pending = "pending",
+  completed = "completed",
+  error = "error",
+  fetchingError = "fetching error",
+}
 
 type SubscribeToStatusProps = {
   jobId: string;
   onStatusUpdate?: (log: Log) => void;
   onCompleted?: (log: Log) => void;
-  options?: PollingOptions;
+  pollingOptions?: PollingOptions;
+};
+
+type UseStatusProps = Omit<SubscribeToStatusProps, "jobId"> & {
+  initialJobIds?: string[];
 };
 
 type PollingOptions = {
@@ -31,18 +40,18 @@ async function fetchStatus(jobId: string): Promise<Status> {
     );
     if (!response.ok) {
       console.error(`Server returned error: ${response.statusText}`);
-      return "fetching error";
+      return Status.fetchingError;
     }
     const resBody = await response.text();
     const { result: status } = JSON.parse(resBody);
-    if (status !== "pending" && status !== "completed" && status !== "error") {
+    if (!Object.values(Status).includes(status)) {
       console.error(`Unexpected status: ${status}`);
-      return "fetching error";
+      return Status.fetchingError;
     }
     return status;
   } catch (error) {
     console.error(`Error fetching status: ${error}`);
-    return "fetching error";
+    return Status.fetchingError;
   }
 }
 
@@ -50,7 +59,7 @@ async function subscribeToStatus({
   jobId,
   onStatusUpdate = () => {},
   onCompleted = () => {},
-  options = {},
+  pollingOptions = {},
 }: SubscribeToStatusProps) {
   const {
     initialDelay = 1000,
@@ -58,7 +67,7 @@ async function subscribeToStatus({
     maxAttempts = 10,
     backoffFactor = 2,
     jitter = true,
-  } = options;
+  } = pollingOptions;
 
   let attempts = 0;
   let delay = initialDelay;
@@ -85,32 +94,48 @@ async function subscribeToStatus({
     delay = Math.min(delay, maxDelay);
   }
 
-  onCompleted({ timestamp: new Date(), jobId, status: "fetching error" });
+  onCompleted({ timestamp: new Date(), jobId, status: Status.fetchingError });
 }
 
-const useStatus = () => {
+const useStatus = ({
+  initialJobIds = [],
+  onStatusUpdate = () => {},
+  onCompleted = () => {},
+  pollingOptions = {},
+}: UseStatusProps) => {
+  const [jobIds, setJobIds] = useState<string[]>(initialJobIds);
   const [statusLogs, setStatusLogs] = useState<Log[]>([]);
+  const [statuses, setStatuses] = useState<Record<string, Status>>({});
 
-  async function subscribeToStatusWithHook({
-    jobId,
-    onStatusUpdate = () => {},
-    onCompleted = () => {},
-    options = {},
-  }: SubscribeToStatusProps) {
-    await subscribeToStatus({
-      jobId,
-      onStatusUpdate: (log) => {
-        setStatusLogs((logs) => [...logs, log]);
-        onStatusUpdate(log);
-      },
-      onCompleted: (status) => {
-        onCompleted(status);
-      },
-      options,
-    });
+  async function subscribeToJob(jobId: string) {
+    setJobIds((prev) => [...prev, jobId]);
   }
 
-  return { statusLogs, subscribeToStatusWithHook };
+  useEffect(() => {
+    jobIds.forEach(async (jobId) => {
+      if (
+        statuses[jobId] != Status.completed &&
+        statuses[jobId] != Status.error
+      ) {
+        await subscribeToStatus({
+          jobId,
+          onStatusUpdate: (log) => {
+            setStatusLogs((prev) => [...prev, log]);
+            setStatuses((prev) => ({ ...prev, [log.jobId]: log.status }));
+            onStatusUpdate(log);
+          },
+          onCompleted: (log) => {
+            setStatuses((prev) => ({ ...prev, [log.jobId]: log.status }));
+            onCompleted(log);
+          },
+          pollingOptions,
+        });
+      }
+    });
+  }, [jobIds]);
+
+  return { statusLogs, statuses, jobIds, subscribeToJob };
 };
 
-export { useStatus, subscribeToStatus };
+//exports of the client library that the user can use
+export { subscribeToStatus, useStatus };

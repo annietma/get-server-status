@@ -6,23 +6,25 @@ import { useState } from "react";
 import { useStatus } from "./lib/clientLibrary";
 
 export default function Home() {
-  const { statusLogs, subscribeToStatusWithHook } = useStatus();
-  const [jobId, setJobId] = useState("");
+  const [jobIdInput, setJobIdInput] = useState("");
+  const { statusLogs, statuses, jobIds, subscribeToJob } = useStatus({
+    initialJobIds: ["012345"],
+  });
 
   return (
-    <div className="bg-white h-screen w-screen flex flex-col items-center py-20">
-      <div className="w-1/2 items-center flex flex-col gap-4 min-w-[500px]">
+    <div className="bg-white h-screen w-screen flex flex-row py-20 min-w-[1000px]">
+      <div className="w-1/2 items-center flex flex-col gap-4 px-10">
         <form
           className="flex flex-row items-center gap-2 w-full"
           onSubmit={(e) => {
             e.preventDefault();
-            subscribeToStatusWithHook({ jobId });
+            subscribeToJob(jobIdInput);
           }}
         >
           <Input
             placeholder="Enter Job ID (e.g. 123450)"
-            value={jobId}
-            onChange={(e) => setJobId(e.target.value.slice(0, 10))}
+            value={jobIdInput}
+            onChange={(e) => setJobIdInput(e.target.value.slice(0, 10))}
           />
           <Button type="submit">Subscribe to Job Status</Button>
         </form>
@@ -56,6 +58,32 @@ export default function Home() {
               </p>
             </div>
           ))}
+        </div>
+      </div>
+      <div className="w-1/2 items-center flex flex-col gap-4 px-10">
+        <div className="h-10 flex flex-col items-center justify-center border-b w-full">
+          <p className="text-lg font-semibold text-zinc-600">JOB STATUSES</p>
+        </div>
+        <div className="w-full items-center flex flex-col gap-4">
+          {Object.entries(statuses)
+            .reverse()
+            .map(([jobId, status], i) => (
+              <div
+                key={i}
+                className="flex flex-row items-center justify-between gap-2 w-full"
+              >
+                <p className="text-zinc-600 font-medium ">JOB {jobId}</p>
+                <p
+                  className={cn(
+                    " font-semibold",
+                    status === "completed" && "text-green-500",
+                    status === "error" && "text-red-500"
+                  )}
+                >
+                  {status.toUpperCase()}
+                </p>
+              </div>
+            ))}
         </div>
       </div>
     </div>

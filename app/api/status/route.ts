@@ -2,6 +2,7 @@ import client from "@/app/server/redis";
 
 const JOB_BASE_DURATION = 2000; //2 seconds
 const JOB_RANDOM_DELAY = 10000; //10 seconds
+const JOB_ERROR_RATE = 0.1;
 const RATE_LIMIT = 100;
 const RATE_LIMIT_WINDOW = 60;
 
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
     }
 
     //simulate random errors
-    if (Math.random() < 0.1) {
+    if (Math.random() < JOB_ERROR_RATE) {
       await client.del(`${jobId}:startTime`);
       await client.del(`${jobId}:randomDelay`);
       return new Response(JSON.stringify({ result: "error" }), {
