@@ -113,10 +113,7 @@ const useStatus = ({
 
   useEffect(() => {
     jobIds.forEach(async (jobId) => {
-      if (
-        statuses[jobId] != Status.completed &&
-        statuses[jobId] != Status.error
-      ) {
+      if (!statuses[jobId]) {
         await subscribeToStatus({
           jobId,
           onStatusUpdate: (log) => {

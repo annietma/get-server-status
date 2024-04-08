@@ -27,7 +27,7 @@ This NextJS project simulates a client library that subscribes to status updates
     - `maxAttempts`: the maximum number of attempts to poll before giving up (default: 10)
     - `backoffFactor`: the factor by which the delay between polls increases (default: 2)
     - `jitter`: a boolean that determines whether to add jitter to the delay between polls (default: true)
-- `useStatus` is a React hook that provides two exports: `statusLogs`, `statuses`, `jobIds`, and `subscribeToJob`. It takes the same parameters as `subscribeToStatus`, but instead of `jobId`, it takes an optional `initialJobIds`.
+- `useStatus` is a React hook that provides four exports: `statusLogs`, `statuses`, `jobIds`, and `subscribeToJob`. It takes the same parameters as `subscribeToStatus`, but instead of `jobId`, it takes an optional `initialJobIds`.
   - `statusLogs` is an updated array of all status updates for any job since the app mount. Each status update is an object with the following properties:
     - `timestamp`: the time the status was received
     - `jobId`: the ID of the job
